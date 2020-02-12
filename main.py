@@ -1,36 +1,56 @@
 #-*- coding:utf-8 -*-
 from twitterscraper import query_tweets
 import datetime
+import csv
+
+from datacleansing import *
+
+from konlpy.tag import Mecab
+from collections import Counter
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # tweet crawling with keyword
-keyword = '펭수'
-startdate = datetime.date(2020,1,1)
-stopdate = datetime.date(2020,1,2)
-tweet_limit = 1
+keyword = '코로나'
+startdate = datetime.date(2020,2,1)
+stopdate = datetime.date(2020,2,2)
+tweet_limit = 100
 
+# save rawdata to csv file
+f = open('files/'+keyword+'_raw.csv','w',encoding='utf-8-sig',newline='')
+writer = csv.writer(f,delimiter=',')
+
+# crawling data using twitterscraper
 list_of_tweets = query_tweets(keyword, begindate=startdate, enddate=stopdate, limit=tweet_limit)
-#f = open("output.txt", 'w')
-for tweet in list_of_tweets:
-    print("screen_name: "+tweet.screen_name) #사용자아이디
-    print("username: "+tweet.username) #닉네임
-    print("user_id: "+tweet.user_id)
-    print("tweet_id: "+tweet.tweet_id)
-    print("tweet_url: "+tweet.tweet_url)
-    print("timestamp: "+str(tweet.timestamp)) #날짜
-    print("timestamp_epchs: "+str(tweet.timestamp_epochs))
-    print("text: "+tweet.text) #트윗내용
-    print("text_html: "+tweet.text_html)
-    print("links: "+str(tweet.links))
-    print("hashtags: "+str(tweet.hashtags))
-    print("has_media: "+str(tweet.has_media))
-    print("img_urls: "+str(tweet.img_urls))
-    print("video_url: "+str(tweet.video_url))
-    print("likes: "+str(tweet.likes))
-    print("reweets: "+str(tweet.retweets))
-    print("replies: "+str(tweet.replies))
-    print("is_replied: "+str(tweet.is_replied))
-    print("is_reply_to: "+str(tweet.is_reply_to))
-    print("parent_tweet_id: "+tweet.parent_tweet_id)
-    print("reply_to_users: "+str(tweet.reply_to_users))
 
-    #f.write(tweet.text) #텍스트
+text = ""
+for tweet in list_of_tweets:
+    writer.writerow([tweet.screen_name, tweet.username, tweet.timestamp, tweet.text])
+    text = text + tweet.text + "\n"
+f.close()
+
+# data cleansing
+text = clean_http(text)
+text = clean_pic(text)
+text = clean_ATtag(text)
+text = clean_specialsymbol(text)
+text = clean_consonant_vowels(text)
+
+# morphological analysis
+mecab = Mecab()
+morphs = []
+words = []
+
+morphs = mecab.pos(text)
+for word, tag in morphs:
+    if tag in ['NNG']:
+        words.append(word)
+
+count = Counter(words)
+lists = dict(count.most_common())
+print(lists)
+
+# make wordcloud
+wordcloud = WordCloud(font_path = 'files/NanumGothicExtraBold.otf',background_color='white', width=1500, height=1000).generate_from_frequencies(lists)
+plt.axis('off')
+plt.savefig('files/'+keyword+'_wordcloud.png')
