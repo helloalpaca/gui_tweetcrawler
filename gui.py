@@ -1,10 +1,18 @@
 from twitterscraper import query_tweets
 from tkinter import *
+from datacleansing import *
 import datetime
 import csv
+from konlpy.tag import Mecab
+from collections import Counter
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # lbl = label
 # txt = Endtry
+# rd = radio
+
+# save raw data to csv file
 
 def getEntries(event):
     keyword = txt_keyword.get()
@@ -15,16 +23,51 @@ def getEntries(event):
     enddate = datetime.datetime.strptime(endday, "%Y%m%d").date()
     getTweet(keyword, begindate, enddate)
 
-def getTweet(keyword, begindate, enddate):
+def saveCSV(keyword, list_of_tweets):
     f = open('files/'+keyword+'_raw.csv','w',encoding='utf-8-sig',newline='')
     writer = csv.writer(f,delimiter=',')
-
-    # crawling data using twitterscraper
-    list_of_tweets = query_tweets(keyword, begindate=begindate, enddate=enddate, limit=10)
-
     for tweet in list_of_tweets:
         writer.writerow([tweet.screen_name, tweet.username, tweet.timestamp, tweet.text])
     f.close()
+
+def dataCleansing(text):
+    text = clean_http(text)
+    text = clean_pic(text)
+    text = clean_ATtag(text)
+    text = clean_specialsymbol(text)
+    text = clean_consonant_vowels(text)
+    return text
+
+def morphsAnalyze(keyword, text):
+    mecab = Mecab()
+    morphs = []
+    words = []
+
+    morphs = mecab.pos(text)
+    for word, tag in morphs:
+        if tag in ['NNG']:
+            words.append(word)
+
+    count = Counter(words)
+    lists = dict(count.most_common())
+    print(lists)
+    makeWordCloud(keyword, lists)
+
+def makeWordCloud(keyword, lists):
+    wordcloud = WordCloud(font_path = 'files/NanumGothicExtraBold.otf',background_color='white', width=1500, height=1000).generate_from_frequencies(lists)
+    plt.imshow(wordcloud)
+    plt.axis('off')
+    plt.savefig('files/'+keyword+'_wordcloud.png')
+
+def getTweet(keyword, begindate, enddate):
+    # crawling data using twitterscraper
+    text=""
+    list_of_tweets = query_tweets(keyword, begindate=begindate, enddate=enddate, limit=10)
+    saveCSV(keyword, list_of_tweets)
+    for tweet in list_of_tweets:
+        text = text + tweet.text + "\n"
+    text = dataCleansing(text)
+    morphsAnalyze(keyword, text)
 
 window = Tk()
 window.title("Twitter Crawler")
